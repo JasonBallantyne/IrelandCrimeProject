@@ -1,4 +1,4 @@
-# IrishCrimeAnalysis
+# Project
 
 ## Part 1
 Consists of an analysis of the all types of crimes committed in Ireland from the year 2003 to 2019. This data originated from StatBank, Central Statistics Office, Govt.
