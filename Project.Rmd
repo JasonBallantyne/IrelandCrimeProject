@@ -1,0 +1,271 @@
+---
+title: "Project"
+author: "Jason Ballantyne"
+date: "21/12/2021"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r, global_options, include=FALSE}
+knitr::opts_chunk$set(message=FALSE, tidy.opts=list(width.cutoff=60), tidy=TRUE)
+```
+
+```{r}
+# Loading dataset for crime in Ireland between 2003 - 2019
+# source: https://www.kaggle.com/sameerkulkarni91/crime-in-ireland/version/1
+crime = read.csv("IRELAND_CRIME_GARDA_DIVISION_wise_2003-2019.csv")
+```
+
+# Part 1: Analysis
+
+The data set chosen contains complete information of all types of crimes committed in Ireland from the year 2003 to 2019.This data set in its original form has been taken from StatBank, Central Statistics Office, Govt. of Ireland
+website - > https://statbank.cso.ie/
+
+
+```{r, warning=FALSE, message=F}
+library(tidyverse)
+library(reshape2)
+
+# Convert dataframe from wide to long 
+clean = melt(crime, measure.vars = colnames(crime)[6:ncol(crime)])
+
+# Remove preceding X and proceeding Q1,Q2,Q3 
+to_remove = c("X", "Q1", "Q2", "Q3")
+
+clean = crime %>%
+  melt(., measure.vars = colnames(crime)[6:ncol(crime)]) %>%
+  mutate(variable = str_remove_all(variable, "X")) %>%
+  mutate(variable = substr(variable,1,4)) %>%
+  rename(year = variable)
+
+```
+
+The purpose of the above step is to transform all value variables from a wide to a long dataframe. This will be essential in order to create summaries and visualizations. We also removed the preceding "X" and proceeding "Q1,Q2,Q3" so that only year is left.
+
+```{r, warning=F}
+# Overall crime for each year
+clean %>%
+  group_by(year) %>%
+  summarize(total_crimes = sum(value)) %>%
+  ggplot()+
+  geom_line(aes(x = year, y = total_crimes, group =1)) +
+  theme_classic() + 
+  ggtitle("Crime over the years in Ireland")
+
+```
+
+From the above results, we can conclude that the overall crime rate had risen massively during the period of 2003-2008. The reported cases peaked at around 300K per year in 2008. After that the trend has been downwards. Crime rate in 2012 was back to circa 2003 numbers and fortunately 2019 has seen the lowest crime reports in the period of 17 years or ~ 2 decades.
+
+
+```{r, warning=FALSE}
+# breakdown of crime by region
+clean %>%
+  group_by(REGION, year) %>%
+  summarize(total_crimes = sum(value)) %>%
+  ggplot() +
+  geom_bar(aes(x = year, y = total_crimes, fill = REGION), 
+           stat = 'identity', position = "fill") + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.9 , hjust=1)) 
+
+```
+
+In the above analysis, we have broken down crime by region. From these results, we can see that there has been relatively consistent percentages across all years. The highest percent of crimes happen in Dublin where ~35%-40% of all crime occurs. This is followed by Southern Region where ~15%-20% of crime occurs. The least amount of crime happens in the North and West region (about 10%). Data such as this can aid law enforcement in identifying areas where it is necessary to deploy more resources.
+
+```{r, warning=FALSE}
+# breakdown of crime by offence
+clean %>%
+  group_by(TYPE.OF.OFFENCE) %>%
+  summarize(total_crimes = sum(value)) %>%
+  arrange(desc(total_crimes)) %>%
+  top_n(total_crimes, 5)
+```
+
+From the results above, we can see the most common type of crime is theft followed by public order offences and then damage to property. These type of detailed insights into crime can help improve training within An Garda Siochana. The training can be tailored to dealing with theft, for example. Although rigorous and thorough training is essential, having an understanding of the most commonly committed crimes can help prepare enforcement adequately. 
+
+
+```{r, warning=F}
+# breakdown of crime by region filtered for theft and related offences
+clean %>%
+  filter(TYPE.OF.OFFENCE == "THEFT AND RELATED OFFENCES") %>%
+  group_by(year, REGION) %>%
+  summarize(total_crimes = sum(value), .groups = "drop") %>%
+  arrange(desc(total_crimes)) %>%
+  ggplot() +
+  geom_line(aes(x = year, y = total_crimes, color = REGION, group = REGION)) +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.9 , hjust=1)) 
+
+```
+
+Given that theft and related offences was the most common crime, I have filtered for this type of crime across all regions to analyse how it performs across the years. From the graph, we can see that the Dublin Metropolitan Region is by far the greatest offender of this type of crime. The Northern and Western Region appear to be the least common offenders of this type of crime. Trends for areas outside of the Dublin Metropolitan Region have seen a slow but steady decline since 2003 to 2019. However, for the region of Dublin, we can see a steady increase from 2005 - 2013, where there appears to be a shift as a sharp decline occurs leaving 2019 with the lowest count of crime for the Dublin Metropolitan Region between 2003 - 2019. The root of this cannot be determined from the graph, and could have been caused by a variety of factors such as reduced social issues due to increased employment, increase of enforcement, increase of quality of life etc. Various theories can be identified but we would need much more data to prove our hypothesis.
+
+
+To conclude our analysis, from the crime data in Ireland between 2003 - 2019, we have looked at overall crime for each year, a breakdown of crime by region, a breakdown of crime by offence and ultimately a breakdown of crime by region filtered for theft and related offences. For each of these graphs, we summarised the results of the graphs which generated valuable insights of the data.
+
+
+
+# Part 2: R Package
+
+The package that I will be demonstrating will be **dplyr** which is a part of Tidyverse family. This package is essential as it helps the user transform the data using variety of techniques. The package is efficient and works with a lot of speed. The syntax is different from base R and resembles more of a SQL like structure. The pipe operator %>% helps maintain the flow of the code and allows readability. The package contains a set of functions (or “verbs”) that perform common data manipulation operations such as filtering for rows, selecting specific columns, adding new columns and summarizing data which we will now discuss in detail.
+
+
+The essential functions of this package that we will be looking at more closesly are: **filter(), mutate(), select() and summarize()**.
+
+The **filter** function allows you to return a subset of rows meeting a particular condition (or not meeting a condition). So practically, you can remove unwanted rows containing NAs or any value of your choice. The first argument is the tibble whereas the second and subsequent arguments refer to the variables within that tibble or data frame, selecting the subset of rows where the expression is TRUE.
+
+It is often useful to add new columns that are functions of existing columns, this is the job of the **mutate** function. It helps to create a new column or re-work an existing one. You can create a new column by adding col1 + col2 for example. Or you can pass on boolean values if a value meets certain criteria. It is similar to the base transform(), but instead, allows you to refer to columns that you’ve just created. This opens limitless opportunities to mutate data.
+
+Often times you might work with a large dataset with many columns, but only a few columns are of interest to you, this is where **select** can come in handy.**Select** allows you to speedily zoom in on a useful subset using operations that usually only work on numeric variable positions. There are a number of helper functions you can use alongside **select**, some of these include: starts_with(), ends_with(), matches() and contains(). These helper functions allow you to quickly match larger blocks of variables that meet a certain criteria. It is important to note that **select** drops all variables that are not explicitly mentioned. 
+
+
+Finally, the **summarize** function is best utilized in conjunction with the group_by() function. After combining different columns, you may need aggregations like count, average, sum through which this function can help you. The output will have a single row summarizing all observations in the input.**Summarize** will contain one column for each grouping variable and one column for each of the summary statistics that you have specified.
+
+For demonstration purposes, let's look at the most popular iris dataset.
+
+```{r}
+summary(iris)
+
+iris %>%
+  # using filter to only select setosa species
+  filter(Species == "setosa") %>%
+  
+  # using mutate to add petal.length and width together
+  mutate(Petal.Sum = Petal.Length + Petal.Width) %>%
+  
+  # using select to remove Sepal Length and Sepal Width from our table
+  select(-Sepal.Length, -Sepal.Width)
+```
+From our results above, we have demonstrated the functionality of filter, mutate and select.
+Filter was used to only display the species "setosa".
+Mutate was used to add length and width together to create a new column called "Petal.sum".
+Select was used to remove "Sepal.Length" and "Sepal.Width" from our table.
+
+
+```{r}
+# using summarize function now to demonstrate average petal length and 
+# sum petal length of all species
+iris %>%
+  group_by(Species) %>%
+  summarize(Avg.Petal.Length = mean(Petal.Length),
+            Sum.Petal.Length = sum(Petal.Length))
+```
+
+In the demonstration above, we used a simple group_by followed by the summarize function. The summarize function was used to find the average petal length and sum of petal length by species.
+
+To conclude, we have clearly summarised the purpose of the package. We have given a detailed description as well as demonstrated the functionality of some of the main functions using the iris dataset. Finally, the code and output was shown as well as a description of the demonstration examples. 
+
+# Part 3: Functions
+
+The function I have created to provide statistical analysis of interest is a function that calculates the confidence interval of a proportion where p is the sample proportion and n is the sample size. The confidence interval percentage is 95% by default.
+
+```{r}
+# Sample proportion is set to 0.4 and the sample size is set to 100.
+s = list(name = "Experiment1", p = 0.4, n = 100)
+
+# Turn object into a class called CI_proportion
+new_CI_proportion <- function(lst){
+    structure(lst, class = "CI_proportion" )
+}
+
+# Turning s variable into a class s_data
+s_data <- new_CI_proportion(s)
+
+# Providing appropriate print method
+print.CI_proportion <- function(s) {
+  # Generating lower and upper limits
+  p.lower = s$p - 1.96 * sqrt(s$p*(1-s$p)/s$n)
+  p.upper = s$p + 1.96 * sqrt(s$p*(1-s$p)/s$n)
+  result = c(p.lower,p.upper)
+  
+  # Concatenating and printing
+  cat(s$name, "\n")
+  cat("Lower bound:", result[1], "\n")
+  cat("Upper bound:", result[2])
+}
+
+# Passing the s_data through our print method
+print(s_data)
+
+```
+
+The result above displays the lower and upper limits of the confidence interval.
+
+```{r}
+# Providing appropriate plot method
+plot.CI_proportion <- function(s) {
+  # Generating lower and upper limits
+  p.lower = s$p - 1.96 * sqrt(s$p*(1-s$p)/s$n)
+  p.upper = s$p + 1.96 * sqrt(s$p*(1-s$p)/s$n)
+  result = c(p.lower,p.upper)
+  
+  # define the standard deviation
+  std = 2
+  
+  # create vector for values of x that span a sufficient range of
+  # standard deviations on either side of the mean
+  x = seq(0.25, 0.55, 0.01)
+  
+  # use dnorm() to calculate probabilities for each x
+  y = dnorm(x, mean = mean(x), sd = std)
+  
+  # plot normal distribution curve; the options xaxs = "i" and yaxs = "i"
+  # force the axes to begin and end at the limits of the data
+  plot(x, y, type = "l", lwd = 2, col = "ivory4", 
+       main = "Confidence Interval plot",ylab = "Probability", 
+       xlab = "Data", xaxs = "i", yaxs = "i")
+  
+  # Adding text to show the lower and upper limits of the graph
+  text(0.27, 0.1990, "Lower Limit", cex=0.6, pos=4, col="red")
+  text(0.49, 0.1990, "Upper Limit", cex=0.6, pos=4, col="red")
+  
+  # Setting the lower limit based on our p.lower variable
+  lowlim = p.lower
+  
+  # Setting the upper limit based on our p.upper variable
+  uplim = p.upper
+  
+  dx = seq(lowlim, uplim, 0.01)
+  
+  # use polygon to fill in area; x and y are vectors of x,y coordinates
+  # that define the shape that is then filled using the turquoise2 color
+  polygon(x = c(lowlim, dx, uplim), 
+          y = c(0, dnorm(dx, mean = mean(x), sd = 2), 0), 
+          border = NA, col = "turquoise2")
+}
+
+# Passing the s_data through our plot method
+plot(s_data)
+```
+
+This method uses R to model the properties of a Normal Distribution.
+The upper and lower limits were used to plot this graph.
+
+
+```{r}
+# Providing appropriate summary method
+summary.CI_proportion <- function(s) {
+  # Generating lower and upper limits
+  p.lower = s$p - 1.96 * sqrt(s$p*(1-s$p)/s$n)
+  p.upper = s$p + 1.96 * sqrt(s$p*(1-s$p)/s$n)
+  result = c(p.lower,p.upper)
+  
+  
+  # Summary of our confidence interval function,concatenating and printing
+  cat(s$name, "Summary: \n")
+  cat("--------------------\n")
+  cat("Minimum Value:", min(result), "\n")
+  cat("1st Quartile:", quantile(result, 0.25), "\n")
+  cat("Median Value:", median(result), "\n")
+  cat("Mean Value:", mean(result), "\n")
+  cat("3rd Quartile:", quantile(result, 0.75), "\n")
+  cat("Max Value:", max(result), "\n")
+}
+
+# Passing the s_data through our summary method
+summary(s_data)
+```
+The result above provides a summary of the confidence interval by displaying the Minimum Value, 1st Quartile, Median Value, Mean Value, 3rd Quartile and Max Value.
+
+In conclusion, we have provided a working function of the confidence interval which is our analysis of interest. Methods have been created for print, summary and plot and the code has been clearly commented.
